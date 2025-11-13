@@ -9,6 +9,7 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER
 import io
 import json
 import random
+import time
 from datetime import datetime
 
 # Page configuration
@@ -206,46 +207,78 @@ if generate_button:
             status_text = st.empty()
             
             for i in range(quantity):
-                status_text.text(f"Generating resume {i+1} of {quantity}...")
+                status_text.text(f"Generating resume {i+1} of {quantity}... (This may take a moment)")
                 
-                # Add variety to prompt
-                experience_variation = experience + random.randint(-1, 1)
-                if experience_variation < 0:
-                    experience_variation = 0
+                # Add delay between requests to avoid rate limiting
+                if i > 0:
+                    time.sleep(3)  # Wait 3 seconds between requests
                 
-                # Generate unique seed for each resume
-                unique_seed = f"{random.randint(1000, 9999)}-{datetime.now().timestamp()}-{i}"
+                # Retry logic for rate limiting
+                max_retries = 3
+                retry_count = 0
                 
-                # Generate resume content
-                response = chain.invoke({
-                    "department": department,
-                    "sub_department": sub_department,
-                    "experience": experience_variation,
-                    "seed": unique_seed
-                })
+                while retry_count < max_retries:
+                    try:
+                        # Add variety to prompt
+                        experience_variation = experience + random.randint(-1, 1)
+                        if experience_variation < 0:
+                            experience_variation = 0
+                        
+                        # Generate unique seed for each resume
+                        unique_seed = f"{random.randint(1000, 9999)}-{datetime.now().timestamp()}-{i}"
+                        
+                        # Generate resume content
+                        response = chain.invoke({
+                            "department": department,
+                            "sub_department": sub_department,
+                            "experience": experience_variation,
+                            "seed": unique_seed
+                        })
+                        
+                        # Parse JSON response
+                        resume_text = response.content
+                        # Extract JSON from markdown code blocks if present
+                        if "```json" in resume_text:
+                            resume_text = resume_text.split("```json")[1].split("```")[0]
+                        elif "```" in resume_text:
+                            resume_text = resume_text.split("```")[1].split("```")[0]
+                        
+                        resume_data = json.loads(resume_text.strip())
+                        
+                        # Add fake contact info
+                        resume_data['email'] = generate_fake_email(resume_data['name'])
+                        resume_data['phone'] = generate_fake_phone()
+                        
+                        st.session_state.generated_resumes.append(resume_data)
+                        break  # Success, exit retry loop
+                        
+                    except Exception as e:
+                        error_msg = str(e)
+                        if "429" in error_msg or "quota" in error_msg.lower():
+                            retry_count += 1
+                            if retry_count < max_retries:
+                                wait_time = 25 * retry_count  # Exponential backoff
+                                status_text.text(f"Rate limit hit. Waiting {wait_time} seconds before retry {retry_count}/{max_retries}...")
+                                time.sleep(wait_time)
+                            else:
+                                st.error(f"Rate limit exceeded. Successfully generated {len(st.session_state.generated_resumes)} resumes. Please wait a few minutes and try again for the remaining resumes.")
+                                break
+                        else:
+                            st.error(f"Error on resume {i+1}: {error_msg}")
+                            break
                 
-                # Parse JSON response
-                resume_text = response.content
-                # Extract JSON from markdown code blocks if present
-                if "```json" in resume_text:
-                    resume_text = resume_text.split("```json")[1].split("```")[0]
-                elif "```" in resume_text:
-                    resume_text = resume_text.split("```")[1].split("```")[0]
-                
-                resume_data = json.loads(resume_text.strip())
-                
-                # Add fake contact info
-                resume_data['email'] = generate_fake_email(resume_data['name'])
-                resume_data['phone'] = generate_fake_phone()
-                
-                st.session_state.generated_resumes.append(resume_data)
                 progress_bar.progress((i + 1) / quantity)
             
-            status_text.text("✅ All resumes generated successfully!")
-            st.success(f"Generated {quantity} professional resumes!")
+            status_text.text(f"✅ Successfully generated {len(st.session_state.generated_resumes)} resumes!")
+            if len(st.session_state.generated_resumes) == quantity:
+                st.success(f"Generated {quantity} professional resumes!")
+            else:
+                st.warning(f"Generated {len(st.session_state.generated_resumes)} out of {quantity} resumes due to rate limits.")
             
         except Exception as e:
             st.error(f"Error generating resumes: {str(e)}")
+            if "429" in str(e) or "quota" in str(e).lower():
+                st.info("💡 **Tip**: You've hit the API rate limit. Try:\n- Reducing the quantity\n- Waiting a few minutes\n- Using a different API key\n- Upgrading to a paid plan")
 
 # Display generated resumes in grid
 if st.session_state.generated_resumes:

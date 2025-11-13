@@ -195,7 +195,7 @@ if generate_button:
         try:
             # Initialize LangChain with Gemini
             llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash-exp",
+                model="gemini-2.0-flash",
                 google_api_key=api_key,
                 temperature=1.0
             )

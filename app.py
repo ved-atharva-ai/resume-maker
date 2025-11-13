@@ -15,59 +15,31 @@ import json
 import random
 import time
 from datetime import datetime
+from faker import Faker
 
-# Page configuration
+fake = Faker()
+
 st.set_page_config(page_title="Professional Resume Generator", layout="wide")
 
-# Initialize session state
 if 'generated_resumes' not in st.session_state:
     st.session_state.generated_resumes = []
 
-# Fake data generators
 def generate_fake_phone():
-    return f"+1-{random.randint(200,999)}-{random.randint(200,999)}-{random.randint(1000,9999)}"
+    return fake.phone_number()
 
 def generate_fake_email(name):
-    domains = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "protonmail.com"]
-    return f"{name.lower().replace(' ', '.')}{random.randint(10,99)}@{random.choice(domains)}"
+    return fake.email()
 
-def generate_unique_name(index, department):
-    """Generate a unique name based on index"""
-    first_names = [
-        "James", "Mary", "Robert", "Patricia", "Michael", "Jennifer", "William", "Linda",
-        "David", "Elizabeth", "Richard", "Barbara", "Joseph", "Susan", "Thomas", "Jessica",
-        "Charles", "Sarah", "Christopher", "Karen", "Daniel", "Nancy", "Matthew", "Lisa",
-        "Anthony", "Betty", "Mark", "Margaret", "Donald", "Sandra", "Steven", "Ashley",
-        "Paul", "Kimberly", "Andrew", "Emily", "Joshua", "Donna", "Kenneth", "Michelle",
-        "Kevin", "Carol", "Brian", "Amanda", "George", "Dorothy", "Timothy", "Melissa",
-        "Ronald", "Deborah", "Edward", "Stephanie", "Jason", "Rebecca", "Jeffrey", "Sharon",
-        "Ryan", "Laura", "Jacob", "Cynthia", "Gary", "Kathleen", "Nicholas", "Amy",
-        "Eric", "Angela", "Jonathan", "Shirley", "Stephen", "Anna", "Larry", "Brenda",
-        "Justin", "Pamela", "Scott", "Emma", "Brandon", "Nicole", "Benjamin", "Helen",
-        "Samuel", "Samantha", "Raymond", "Katherine", "Gregory", "Christine", "Alexander", "Debra",
-        "Patrick", "Rachel", "Frank", "Carolyn", "Dennis", "Janet", "Jerry", "Catherine"
-    ]
-    
-    last_names = [
-        "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis",
-        "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas",
-        "Taylor", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson", "White",
-        "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker", "Young",
-        "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores",
-        "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell", "Mitchell",
-        "Carter", "Roberts", "Gomez", "Phillips", "Evans", "Turner", "Diaz", "Parker",
-        "Cruz", "Edwards", "Collins", "Reyes", "Stewart", "Morris", "Morales", "Murphy",
-        "Cook", "Rogers", "Gutierrez", "Ortiz", "Morgan", "Cooper", "Peterson", "Bailey",
-        "Reed", "Kelly", "Howard", "Ramos", "Kim", "Cox", "Ward", "Richardson",
-        "Watson", "Brooks", "Chavez", "Wood", "James", "Bennett", "Gray", "Mendoza",
-        "Ruiz", "Hughes", "Price", "Alvarez", "Castillo", "Sanders", "Patel", "Myers"
-    ]
-    
-    first = first_names[index % len(first_names)]
-    last = last_names[(index * 7) % len(last_names)]  # Use prime multiplier for more variation
-    return f"{first} {last}"
+def generate_unique_name(index, department, name_hint=None):
+    if name_hint:
+        for _ in range(10):
+            name = fake.name()
+            if name[0].upper() == name_hint.upper():
+                return name
+        return fake.name()
+    else:
+        return fake.name()
 
-# Resume generation prompt
 resume_prompt = PromptTemplate(
     input_variables=["department", "sub_department", "experience", "seed", "name_hint"],
     template="""Generate a detailed professional resume for a candidate with the following profile:
@@ -117,12 +89,10 @@ Make it realistic and professional for the specified department and experience l
 )
 
 def generate_pdf(resume_data):
-    """Generate a professional PDF resume"""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     story = []
     
-    # Define styles
     styles = getSampleStyleSheet()
     
     title_style = ParagraphStyle(
@@ -163,26 +133,21 @@ def generate_pdf(resume_data):
         leading=14
     )
     
-    # Name
     story.append(Paragraph(resume_data['name'], title_style))
     
-    # Contact Info
     contact_text = f"{resume_data['email']} | {resume_data['phone']}"
     story.append(Paragraph(contact_text, contact_style))
     story.append(HRFlowable(width="100%", thickness=1, color='#BDC3C7', spaceAfter=12))
     
-    # Professional Summary
     story.append(Paragraph("PROFESSIONAL SUMMARY", heading_style))
     story.append(Paragraph(resume_data['summary'], body_style))
     story.append(Spacer(1, 0.1*inch))
     
-    # Skills
     story.append(Paragraph("SKILLS", heading_style))
     skills_text = " • ".join(resume_data['skills'])
     story.append(Paragraph(skills_text, body_style))
     story.append(Spacer(1, 0.1*inch))
     
-    # Work Experience
     story.append(Paragraph("WORK EXPERIENCE", heading_style))
     for exp in resume_data['experience']:
         title_company = f"<b>{exp['title']}</b> - {exp['company']}"
@@ -192,13 +157,11 @@ def generate_pdf(resume_data):
             story.append(Paragraph(f"• {resp}", body_style))
         story.append(Spacer(1, 0.1*inch))
     
-    # Education
     story.append(Paragraph("EDUCATION", heading_style))
     edu_text = f"<b>{resume_data['education']['degree']}</b><br/>{resume_data['education']['university']}<br/>{resume_data['education']['year']}"
     story.append(Paragraph(edu_text, body_style))
     story.append(Spacer(1, 0.1*inch))
     
-    # Certifications
     if resume_data['certifications']:
         story.append(Paragraph("CERTIFICATIONS", heading_style))
         for cert in resume_data['certifications']:
@@ -208,15 +171,12 @@ def generate_pdf(resume_data):
     buffer.seek(0)
     return buffer
 
-# Streamlit UI
 st.title("🎯 Professional Resume Generator")
 st.markdown("Generate multiple professional resumes using AI")
 
-# Sidebar for input
 with st.sidebar:
     st.header("Resume Configuration")
     
-    # API Key input
     api_key = st.text_input("Google API Key", type="password", help="Enter your Gemini API key")
     
     st.info("💡 **Free Tier Limits**: Generate 2-5 resumes at a time to avoid rate limits")
@@ -233,7 +193,6 @@ with st.sidebar:
         st.session_state.generated_resumes = []
         st.rerun()
 
-# Main content area
 if generate_button:
     if not api_key:
         st.error("Please enter your Google API Key in the sidebar")
@@ -241,7 +200,6 @@ if generate_button:
         st.error("Please fill in Department and Sub-Department fields")
     else:
         try:
-            # Initialize LangChain with Gemini
             llm = ChatGoogleGenerativeAI(
                 model="gemini-2.0-flash",
                 google_api_key=api_key,
@@ -254,34 +212,28 @@ if generate_button:
             progress_bar = st.progress(0)
             status_text = st.empty()
             
-            # List of name starting letters for variety
             name_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W', 'Z']
             
             for i in range(quantity):
                 status_text.text(f"Generating resume {i+1} of {quantity}... (This may take a moment)")
                 
-                # Add delay between requests to avoid rate limiting
                 if i > 0:
-                    time.sleep(4)  # Increased to 4 seconds for better rate limiting
+                    time.sleep(4)
                 
-                # Retry logic for rate limiting
                 max_retries = 3
                 retry_count = 0
                 
                 while retry_count < max_retries:
                     try:
-                        # Add variety to prompt
                         experience_variation = experience + random.randint(-1, 2)
                         if experience_variation < 0:
                             experience_variation = 0
                         
-                        # Generate unique seed and name hint for each resume
                         unique_seed = f"RESUME-{i}-{random.randint(10000, 99999)}-{int(time.time() * 1000)}"
                         name_hint = name_letters[i % len(name_letters)]
                         
                         status_text.text(f"Generating resume {i+1} of {quantity}... Calling API...")
                         
-                        # Generate resume content
                         response = chain.invoke({
                             "department": department,
                             "sub_department": sub_department,
@@ -292,13 +244,10 @@ if generate_button:
                         
                         status_text.text(f"Generating resume {i+1} of {quantity}... Parsing response...")
                         
-                        # Parse JSON response
                         resume_text = response.content
                         
-                        # Debug: Show first 200 chars of response
                         st.sidebar.text(f"Response preview: {resume_text[:200]}...")
                         
-                        # Extract JSON from markdown code blocks if present
                         if "```json" in resume_text:
                             resume_text = resume_text.split("```json")[1].split("```")[0]
                         elif "```" in resume_text:
@@ -306,17 +255,15 @@ if generate_button:
                         
                         resume_data = json.loads(resume_text.strip())
                         
-                        # Force unique name by overwriting with generated name
-                        unique_name = generate_unique_name(i, department)
+                        unique_name = generate_unique_name(i, department, name_hint)
                         resume_data['name'] = unique_name
                         
-                        # Add fake contact info
                         resume_data['email'] = generate_fake_email(resume_data['name'])
                         resume_data['phone'] = generate_fake_phone()
                         
                         st.session_state.generated_resumes.append(resume_data)
                         status_text.text(f"✅ Resume {i+1} completed!")
-                        break  # Success, exit retry loop
+                        break
                         
                     except json.JSONDecodeError as je:
                         st.error(f"JSON Parse Error on resume {i+1}: {str(je)}")
@@ -328,7 +275,7 @@ if generate_button:
                         if "429" in error_msg or "quota" in error_msg.lower():
                             retry_count += 1
                             if retry_count < max_retries:
-                                wait_time = 25 * retry_count  # Exponential backoff
+                                wait_time = 25 * retry_count
                                 status_text.text(f"Rate limit hit. Waiting {wait_time} seconds before retry {retry_count}/{max_retries}...")
                                 time.sleep(wait_time)
                             else:
@@ -351,12 +298,10 @@ if generate_button:
             if "429" in str(e) or "quota" in str(e).lower():
                 st.info("💡 **Tip**: You've hit the API rate limit. Try:\n- Reducing the quantity\n- Waiting a few minutes\n- Using a different API key\n- Upgrading to a paid plan")
 
-# Display generated resumes in grid
 if st.session_state.generated_resumes:
     st.markdown("---")
     st.header("Generated Resumes")
     
-    # Create grid layout
     cols_per_row = 2
     resumes = st.session_state.generated_resumes
     
@@ -383,7 +328,6 @@ if st.session_state.generated_resumes:
                             for exp in resume['experience'][:2]:
                                 st.write(f"• {exp['title']} at {exp['company']}")
                         
-                        # Download button
                         pdf_buffer = generate_pdf(resume)
                         st.download_button(
                             label="📥 Download PDF",
@@ -394,9 +338,8 @@ if st.session_state.generated_resumes:
                             key=f"download_btn_{i+j}"
                         )
 
-# Footer
 st.markdown("---")
 st.markdown(
-    "<div style='text-align: center; color: #7f8c8d;'>Built with Streamlit, LangChain & Gemini 2.5 Flash</div>",
+    "<div style='text-align: center; color: #7f8c8d;'>Built with Streamlit, LangChain & Gemini 2.0 Flash</div>",
     unsafe_allow_html=True
 )

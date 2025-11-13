@@ -11,13 +11,6 @@ Faker
 filetype
 gitdb
 GitPython
-google-ai-generativelanguage
-google-api-core
-google-api-python-client
-google-auth
-google-auth-httplib2
-google-generativeai
-googleapis-common-protos
 grpcio
 grpcio-status
 h11

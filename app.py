@@ -196,7 +196,7 @@ if generate_button:
             llm = ChatGoogleGenerativeAI(
                 model="gemini-2.0-flash-exp",
                 google_api_key=api_key,
-                temperature=1.2
+                temperature=1.0
             )
             
             chain = resume_prompt | llm

@@ -28,15 +28,18 @@ def generate_fake_email(name):
 
 # Resume generation prompt
 resume_prompt = PromptTemplate(
-    input_variables=["department", "sub_department", "experience"],
+    input_variables=["department", "sub_department", "experience", "seed"],
     template="""Generate a detailed professional resume for a candidate with the following profile:
     
 Department: {department}
 Sub-Department: {sub_department}
 Years of Experience: {experience}
+Unique Seed: {seed}
+
+IMPORTANT: Generate a COMPLETELY DIFFERENT and UNIQUE resume each time. Use different names, companies, universities, and experiences.
 
 Create a complete resume with the following sections in JSON format:
-1. Full Name (realistic name)
+1. Full Name (realistic name - use diverse first and last names)
 2. Professional Summary (3-4 sentences)
 3. Skills (8-12 relevant technical and soft skills)
 4. Work Experience (2-3 positions with company names, job titles, dates, and 4-5 bullet points each)
@@ -191,9 +194,9 @@ if generate_button:
         try:
             # Initialize LangChain with Gemini
             llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
+                model="gemini-2.0-flash-exp",
                 google_api_key=api_key,
-                temperature=0.9
+                temperature=1.2
             )
             
             chain = resume_prompt | llm
@@ -205,11 +208,20 @@ if generate_button:
             for i in range(quantity):
                 status_text.text(f"Generating resume {i+1} of {quantity}...")
                 
+                # Add variety to prompt
+                experience_variation = experience + random.randint(-1, 1)
+                if experience_variation < 0:
+                    experience_variation = 0
+                
+                # Generate unique seed for each resume
+                unique_seed = f"{random.randint(1000, 9999)}-{datetime.now().timestamp()}-{i}"
+                
                 # Generate resume content
                 response = chain.invoke({
                     "department": department,
                     "sub_department": sub_department,
-                    "experience": experience
+                    "experience": experience_variation,
+                    "seed": unique_seed
                 })
                 
                 # Parse JSON response
